@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, File, Uplo
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 import uuid
+import logging
 
 from app.models.photo import (
     PhotoResponse,
@@ -14,10 +15,14 @@ from app.models.photo import (
     BulkDownloadRequest,
     Photo as PhotoModel,
 )
+from app.models.event import Event as EventModel
 from app.dependencies import get_current_user
 from app.database import get_db
 from app.routers.events import verify_event_ownership
-from app.models.auth import MessageResponse # Keep unused imports as per user instruction
+from app.models.auth import MessageResponse
+from app.services.email import email_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/events", tags=["photos"])
 
@@ -64,6 +69,14 @@ async def update_photo(
     """
     verify_event_ownership(db, event_id, user["uid"])
     
+    # Get event for email context
+    event = db.query(EventModel).filter(EventModel.id == event_id).first()
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Event with ID '{event_id}' not found."
+        )
+    
     photo = db.query(PhotoModel).filter(PhotoModel.id == photo_id, PhotoModel.event_id == event_id).first()
     if not photo:
         raise HTTPException(
@@ -71,12 +84,38 @@ async def update_photo(
             detail=f"Photo with ID '{photo_id}' not found in event '{event_id}'."
         )
     
+    # Track if approval status changed
+    old_approved_status = photo.approved
     update_data = request.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(photo, key, value)
-        
+    
     db.commit()
     db.refresh(photo)
+    
+    # Send email notification if approval status changed and photo was uploaded by a public user
+    if 'approved' in update_data and photo.uploaded_by and photo.uploaded_by != event.host_id:
+        try:
+            # Check if approval status actually changed
+            if old_approved_status != photo.approved:
+                if photo.approved:
+                    # Photo was approved
+                    email_service.send_photo_approved_email(
+                        user_email=photo.uploaded_by,  # Assuming uploaded_by contains email
+                        event_name=event.name,
+                        photo_url=photo.url,
+                        user_name=None
+                    )
+                else:
+                    # Photo was rejected/unapproved
+                    email_service.send_photo_rejected_email(
+                        user_email=photo.uploaded_by,
+                        event_name=event.name,
+                        reason=None,
+                        user_name=None
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to send photo notification email: {e}")
     
     return photo
 
@@ -146,27 +185,4 @@ async def bulk_download_photos(
     return MessageResponse(
         message=f"Download prepared for {len(request.photo_ids)} photo(s) from event '{event_id}'. "
                  "Download link will be provided shortly."
-    )
-
-# --- Public Visitor Flow Endpoints ---
-
-@router.post("/public/events/{event_slug}/photos", response_model=PhotoResponse)
-async def upload_photo(
-    event_slug: str,
-    file: UploadFile = File(...),
-    caption: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Upload a photo to a public event.
-    (This endpoint is a placeholder and does not handle file uploads yet).
-    """
-    # TODO: 1. Find event by slug.
-    # TODO: 2. Verify event password if required.
-    # TODO: 3. Upload file to storage service (e.g., S3, Firebase Storage).
-    # TODO: 4. Create a new Photo record in the database.
-    
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Public photo upload functionality is not yet implemented."
     )
