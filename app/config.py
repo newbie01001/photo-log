@@ -11,6 +11,10 @@ import os
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
+    # Database configuration
+    # Example for PostgreSQL: "postgresql://user:password@host:port/dbname"
+    database_url: str = "postgresql://user:password@localhost/photolog"
+    
     # Firebase configuration
     # Path to the Firebase service account key file. Can be relative or absolute.
     firebase_credentials_path: str = "firebase_account_services.json"

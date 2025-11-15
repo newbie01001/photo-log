@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
+from sqlalchemy.orm import Session
 
 from app.models.auth import (
     TokenRequest,
@@ -13,6 +14,8 @@ from app.models.auth import (
 )
 from app.dependencies import get_current_user
 from app.services.firebase import verify_firebase_token
+from app.database import get_db
+from app.crud import get_or_create_user
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -20,42 +23,43 @@ router = APIRouter(prefix="/me", tags=["me"])
 
 @router.get("", response_model=UserResponse)
 async def get_current_user_profile(
-    user: Dict[str, Any] = Depends(get_current_user)
+    user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Get current host profile.
-    
-    Returns user information derived from the verified Firebase token.
-    TODO: Query database for a more complete user profile including plan/limits.
+    Get current host profile from the database.
     """
+    db_user = get_or_create_user(db, user)
     return UserResponse(
-        uid=user["uid"],
-        email=user.get("email"),
-        email_verified=user.get("email_verified", False),
-        name=user.get("name"),
+        uid=db_user.id,
+        email=db_user.email,
+        email_verified=user.get("email_verified", False), # This still comes from the token
+        name=db_user.name,
     )
 
 
 @router.patch("", response_model=UserResponse)
 async def update_profile(
     request: UpdateProfileRequest,
-    user: Dict[str, Any] = Depends(get_current_user)
+    user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Update profile settings (e.g., name).
-    
-    Currently, this endpoint acknowledges the update and returns the (potentially updated)
-    user information from the token. It does NOT persist changes to a database yet.
-    TODO: Update user profile in database.
+    Update profile settings (e.g., name) in the database.
     """
-    # For now, just acknowledge the update and reflect the change in the response
-    # TODO: Update user profile in database
+    db_user = get_or_create_user(db, user)
+    
+    if request.name is not None:
+        db_user.name = request.name
+        
+    db.commit()
+    db.refresh(db_user)
     
     return UserResponse(
-        uid=user["uid"],
-        email=user.get("email"),
-        email_verified=user.get("email_verified", False),
-        name=request.name if request.name else user.get("name"),
+        uid=db_user.id,
+        email=db_user.email,
+        email_verified=user.get("email_verified", False), # This still comes from the token
+        name=db_user.name,
     )
 
 

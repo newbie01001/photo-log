@@ -1,7 +1,31 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from sqlalchemy import Column, String, DateTime, func, Boolean, ForeignKey, Text
+from sqlalchemy.orm import relationship
 
+from app.database import Base
+
+# SQLAlchemy ORM Model
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(String, primary_key=True, index=True)
+    host_id = Column(String, ForeignKey("users.id"), nullable=False)
+    name = Column(String, index=True, nullable=False)
+    description = Column(Text, nullable=True)
+    date = Column(DateTime(timezone=True), nullable=False)
+    password = Column(String, nullable=True)
+    cover_image_url = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_archived = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    host = relationship("User", back_populates="events")
+    photos = relationship("Photo", back_populates="event", cascade="all, delete-orphan")
+
+# Pydantic Models
 class EventBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="The name of the event.")
     description: Optional[str] = Field(None, max_length=500, description="A short description of the event.")

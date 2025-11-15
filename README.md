@@ -13,6 +13,9 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 ## Tech Stack
 
 - **FastAPI** - Modern Python web framework
+- **PostgreSQL** - Robust relational database
+- **SQLAlchemy** - Python SQL Toolkit and Object Relational Mapper
+- **Alembic** - Database migrations tool
 - **Firebase Admin SDK** - Token verification and user management
 - **Pydantic** - Data validation and settings management
 - **Uvicorn** - ASGI server
@@ -22,6 +25,7 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 ### 1. Install Dependencies
 
 ```bash
+# Make sure you are in the 'backend' directory
 cd backend
 python -m venv venv
 
@@ -32,6 +36,8 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
+# Also install pydantic[email] for email validation
+pip install 'pydantic[email]'
 ```
 
 ### 2. Firebase Configuration
@@ -39,17 +45,39 @@ pip install -r requirements.txt
 1. You already have `firebase_account_services.json` - make sure it's in the `backend/` directory
 2. The file is already in `.gitignore` to keep it secure
 
-### 3. Environment Variables
+### 3. PostgreSQL Database Setup (using Docker)
 
-Create a `.env` file in the `backend/` directory:
+To run the PostgreSQL database locally for development:
+
+1.  **Install Docker:** If you don't have Docker installed, download and install it from [https://www.docker.com/get-started](https://www.docker.com/get-started).
+2.  **Run PostgreSQL Container:** Open your terminal in the `backend/` directory and run:
+    ```bash
+    docker run --name photolog-db -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d postgres
+    ```
+    This command starts a PostgreSQL container named `photolog-db` with a default user `postgres` and password `mysecretpassword`, mapping port 5432.
+
+### 4. Environment Variables
+
+Create a `.env` file in the `backend/` directory with the following content:
 
 ```env
 FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAILS=admin@photolog.com
+DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+```
+**Important:** Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+
+### 5. Run Database Migrations (Alembic)
+
+After setting up the database and `.env` file, apply the initial database schema:
+
+```bash
+# Make sure your virtual environment is activated
+alembic upgrade head
 ```
 
-### 4. Run the Server
+### 6. Run the Server
 
 ```bash
 # Development mode (with auto-reload)
@@ -72,7 +100,7 @@ The API will be available at:
 2. **Frontend** receives Firebase ID token after successful authentication
 3. **Frontend** sends token to backend in `Authorization: Bearer <token>` header or request body
 4. **Backend** verifies token using Firebase Admin SDK
-5. **Backend** returns user information
+5. **Backend** creates/retrieves user in **PostgreSQL database** and returns user information
 
 ### Supported Auth Methods
 
@@ -88,8 +116,8 @@ The API will be available at:
 
 ### Authentication (`/auth/*`)
 
-- `POST /auth/signup` - Register new user (requires Firebase token)
-- `POST /auth/signin` - User login (requires Firebase token)
+- `POST /auth/signup` - Register new user (requires Firebase token, **creates user in DB**)
+- `POST /auth/signin` - User login (requires Firebase token, **ensures user exists in DB**)
 - `POST /auth/signout` - Sign out
 - `POST /auth/refresh` - Refresh authentication token
 - `POST /auth/verify-email` - Verify email address
@@ -99,29 +127,33 @@ The API will be available at:
 
 ### Host Profile (`/me/*`)
 
-- `GET /me` - Get current user profile (protected)
-- `PATCH /me` - Update user profile (protected)
+- `GET /me` - Get current user profile (**from DB**, protected)
+- `PATCH /me` - Update user profile (**in DB**, protected)
 - `PATCH /me/password` - Change password (protected)
 
 ### Events (`/events/*`)
 
-- `POST /events` - Create a new event
-- `GET /events` - List all events for the current host
-- `GET /events/{event_id}` - Get details for a specific event
-- `PATCH /events/{event_id}` - Update an event's metadata
-- `DELETE /events/{event_id}` - Delete an event
+- `POST /events` - Create a new event (**in DB**)
+- `GET /events` - List all events for the current host (**from DB**)
+- `GET /events/{event_id}` - Get details for a specific event (**from DB**)
+- `PATCH /events/{event_id}` - Update an event's metadata (**in DB**)
+- `DELETE /events/{event_id}` - Delete an event (**from DB**)
 - `POST /events/{event_id}/cover` - (Placeholder) Upload a cover image
 - `GET /events/{event_id}/qr` - (Placeholder) Get a QR code for the event
 - `POST /events/{event_id}/download` - (Placeholder) Trigger a ZIP export of all photos
-- `POST /events/actions/bulk` - Perform bulk actions on events
+- `POST /events/actions/bulk` - Perform bulk actions on events (**in DB**)
 
 ### Photos (Host Moderation) (`/events/{event_id}/photos/*`)
 
-- `GET /events/{event_id}/photos` - Get a paginated list of photos for an event
-- `PATCH /events/{event_id}/photos/{photo_id}` - Update photo metadata (caption, approval)
-- `DELETE /events/{event_id}/photos/{photo_id}` - Delete a single photo
-- `POST /events/{event_id}/photos/bulk-delete` - Delete multiple photos
+- `GET /events/{event_id}/photos` - Get a paginated list of photos for an event (**from DB**)
+- `PATCH /events/{event_id}/photos/{photo_id}` - Update photo metadata (caption, approval) (**in DB**)
+- `DELETE /events/{event_id}/photos/{photo_id}` - Delete a single photo (**from DB**)
+- `POST /events/{event_id}/photos/bulk-delete` - Delete multiple photos (**from DB**)
 - `POST /events/{event_id}/photos/bulk-download` - (Placeholder) Trigger a download of selected photos
+
+### Public Visitor Flow (`/public/*`)
+
+- `POST /public/events/{event_slug}/photos` - (Placeholder) Upload a photo to a public event
 
 ### Admin Authentication (`/admin/auth/*`)
 
@@ -131,15 +163,15 @@ The API will be available at:
 
 ### Admin Dashboard (`/admin/*`)
 
-- `GET /admin/overview` - Get system-wide statistics
-- `GET /admin/events` - List all events in the system
-- `GET /admin/events/{event_id}` - Inspect a specific event
-- `PATCH /admin/events/{event_id}/status` - Update an event's status
-- `DELETE /admin/events/{event_id}` - Force-delete an event
-- `GET /admin/uploads/recent` - Get a feed of recent photo uploads
-- `GET /admin/users` - List all users
-- `GET /admin/users/{user_id}` - Inspect a specific user
-- `PATCH /admin/users/{user_id}/status` - Suspend or reactivate a user
+- `GET /admin/overview` - Get system-wide statistics (**from DB**)
+- `GET /admin/events` - List all events in the system (**from DB**)
+- `GET /admin/events/{event_id}` - Inspect a specific event (**from DB**)
+- `PATCH /admin/events/{event_id}/status` - Update an event's status (**in DB**)
+- `DELETE /admin/events/{event_id}` - Force-delete an event (**from DB**)
+- `GET /admin/uploads/recent` - Get a feed of recent photo uploads (**from DB**)
+- `GET /admin/users` - List all users (**from DB**)
+- `GET /admin/users/{user_id}` - Inspect a specific user (**from DB**)
+- `PATCH /admin/users/{user_id}/status` - Suspend or reactivate a user (**in DB**)
 - `GET /admin/logs` - (Placeholder) Retrieve audit logs
 - `POST /admin/system/export` - (Placeholder) Trigger a system data export
 
@@ -187,7 +219,9 @@ backend/
 │   ├── __init__.py
 │   ├── main.py              # FastAPI app entry point
 │   ├── config.py             # Configuration and settings
+│   ├── database.py           # SQLAlchemy engine, session, and Base
 │   ├── dependencies.py       # Auth dependencies
+│   ├── crud.py               # CRUD operations for database models
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── admin.py         # Admin dashboard models
@@ -206,6 +240,10 @@ backend/
 │   └── services/
 │       ├── __init__.py
 │       └── firebase.py      # Firebase Admin SDK service
+├── alembic/                  # Alembic migration scripts
+│   ├── versions/
+│   └── env.py
+├── alembic.ini               # Alembic configuration
 ├── firebase_account_services.json  # Firebase credentials (keep secret!)
 ├── requirements.txt
 ├── .env                      # Environment variables (create this)
@@ -222,17 +260,15 @@ backend/
 
 ## Next Steps
 
-1. **Implement Database Logic**:
-   - Integrate a database (e.g., SQLite, PostgreSQL).
-   - Replace all mock in-memory databases (`MOCK_DB_*`) with real database queries.
-   - Implement full CRUD operations for users, events, and photos.
-2. **Implement File Storage**:
+1. **Implement File Storage**:
    - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
-   - Implement photo upload/download logic in the respective endpoints.
-3. **Flesh out Placeholder Endpoints**:
-   - Implement QR code generation.
+   - Implement actual photo and cover image upload/download logic in the respective endpoints.
+2. **Flesh out Placeholder Endpoints**:
+   - Implement actual QR code generation for event share links.
    - Implement background tasks for ZIP exports and system data exports.
-   - Implement audit logging.
+   - Implement audit log retrieval from a logging service or database.
+3. **Public Visitor Flow**:
+   - Implement endpoints for public event information and photo uploads.
 
 ## Troubleshooting
 

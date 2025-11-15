@@ -3,6 +3,7 @@ Authentication router - handles all /auth/* endpoints.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
+from sqlalchemy.orm import Session
 
 from app.models.auth import (
     TokenRequest,
@@ -14,18 +15,18 @@ from app.models.auth import (
     MessageResponse,
 )
 from app.services.firebase import verify_firebase_token
+from app.database import get_db
+from app.crud import get_or_create_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=SigninResponse)
-async def signup(request: TokenRequest):
+async def signup(request: TokenRequest, db: Session = Depends(get_db)):
     """
     Register a new host user.
     
-    Supports both email/password and Google sign-in via Firebase.
-    Frontend handles Firebase signup directly (email/password or Google OAuth),
-    then sends the ID token here. Backend verifies the token and returns user info.
+    Verifies the Firebase token and creates a corresponding user in the database if one doesn't already exist.
     """
     try:
         user_info = verify_firebase_token(request.token)
@@ -36,16 +37,14 @@ async def signup(request: TokenRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user_response = UserResponse(
-        uid=user_info["uid"],
-        email=user_info.get("email"),
-        # email_verified defaults to False if not present in user_info
-        email_verified=user_info.get("email_verified", False), 
-        name=user_info.get("name"),
-    )
+    user = get_or_create_user(db, user_info)
     
-    # TODO: Create user profile in database here (e.g., store additional profile data)
-    # For now, just return info from token
+    user_response = UserResponse(
+        uid=user.id,
+        email=user.email,
+        email_verified=user_info.get("email_verified", False), 
+        name=user.name,
+    )
     
     return SigninResponse(
         token=request.token,
@@ -54,13 +53,12 @@ async def signup(request: TokenRequest):
 
 
 @router.post("/signin", response_model=SigninResponse)
-async def signin(request: TokenRequest):
+async def signin(request: TokenRequest, db: Session = Depends(get_db)):
     """
-    Host login - verify Firebase token and return user info.
+    Host login - verifies Firebase token and ensures user exists in the database.
     
-    Supports both email/password and Google sign-in via Firebase.
-    Frontend handles Firebase signin directly (email/password or Google OAuth),
-    then sends the ID token here. Backend verifies the token and returns user info.
+    If the user doesn't exist in the local database (e.g., first sign-in with a social provider),
+    a new user record is created.
     """
     try:
         user_info = verify_firebase_token(request.token)
@@ -71,15 +69,14 @@ async def signin(request: TokenRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user_response = UserResponse(
-        uid=user_info["uid"],
-        email=user_info.get("email"),
-        email_verified=user_info.get("email_verified", False),
-        name=user_info.get("name"),
-    )
+    user = get_or_create_user(db, user_info)
     
-    # TODO: Check if user exists in database, create if needed (e.g., first-time signin after signup)
-    # For now, just return info from token
+    user_response = UserResponse(
+        uid=user.id,
+        email=user.email,
+        email_verified=user_info.get("email_verified", False),
+        name=user.name,
+    )
     
     return SigninResponse(
         token=request.token,

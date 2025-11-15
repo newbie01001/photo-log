@@ -1,11 +1,30 @@
 """
-Pydantic models for photo-related operations.
+Pydantic and SQLAlchemy models for photo-related operations.
 """
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import Column, String, DateTime, func, Boolean, ForeignKey, Text
+from sqlalchemy.orm import relationship
 
-# Request models (what the frontend sends)
+from app.database import Base
+
+# SQLAlchemy ORM Model
+class Photo(Base):
+    __tablename__ = "photos"
+
+    id = Column(String, primary_key=True, index=True)
+    event_id = Column(String, ForeignKey("events.id"), nullable=False)
+    url = Column(String, nullable=False)
+    thumbnail_url = Column(String, nullable=True)
+    caption = Column(Text, nullable=True)
+    approved = Column(Boolean, default=False, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+    uploaded_by = Column(String, nullable=True) # Could be a user ID or an anonymous identifier
+
+    event = relationship("Event", back_populates="photos")
+
+# Pydantic Models
 class UpdatePhotoRequest(BaseModel):
     """Request to update photo metadata."""
     caption: Optional[str] = Field(None, max_length=255, description="New caption for the photo.")
@@ -19,7 +38,6 @@ class BulkDownloadRequest(BaseModel):
     """Request to download multiple photos."""
     photo_ids: List[str] = Field(..., description="List of photo IDs to download.")
 
-# Response models (what the backend returns)
 class PhotoResponse(BaseModel):
     """Photo information response."""
     id: str = Field(..., description="The unique identifier for the photo.")

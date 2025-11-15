@@ -6,14 +6,20 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
 
 ### ✅ Completed Features
 
-1. **Firebase Admin SDK Integration**
-   - Token verification service
-   - Automatic initialization on startup
-   - Error handling for expired/invalid tokens
+1. **PostgreSQL Database Integration**
+   - ✅ SQLAlchemy ORM for models (User, Event, Photo)
+   - ✅ Alembic for database migrations
+   - ✅ Database session management (`app/database.py`)
+   - ✅ Centralized CRUD operations (`app/crud.py`)
 
-2. **Authentication Endpoints** (`/auth/*`)
-   - ✅ Signup (email/password + Google)
-   - ✅ Signin (email/password + Google)
+2. **Firebase Admin SDK Integration**
+   - ✅ Token verification service
+   - ✅ Automatic initialization on startup
+   - ✅ Error handling for expired/invalid tokens
+
+3. **Authentication Endpoints** (`/auth/*`)
+   - ✅ Signup (email/password + Google, **creates user in DB**)
+   - ✅ Signin (email/password + Google, **ensures user exists in DB**)
    - ✅ Signout
    - ✅ Token refresh
    - ✅ Email verification
@@ -21,57 +27,57 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Forgot password
    - ✅ Reset password
 
-3. **Host Profile Endpoints** (`/me/*`)
-   - ✅ Get current user profile (`/me`)
-   - ✅ Update profile (`/me`)
-   - ✅ Change password (`/me/password`)
+4. **Host Profile Endpoints** (`/me/*`)
+   - ✅ Get current user profile (**from DB**)
+   - ✅ Update profile (**in DB**)
+   - ✅ Change password
 
-4. **Admin Authentication** (`/admin/auth/*`)
+5. **Event Management Endpoints** (`/events/*`) - *Fully Database Integrated*
+   - ✅ Create event (**in DB**)
+   - ✅ List host's events (**from DB**)
+   - ✅ Get event details (**from DB**)
+   - ✅ Update event metadata (**in DB**)
+   - ✅ Delete event (**from DB**)
+   - ✅ (Placeholder) Upload/replace cover image
+   - ✅ (Placeholder) Fetch/generate QR code
+   - ✅ (Placeholder) Trigger ZIP export of photos
+   - ✅ Bulk actions on events (**in DB**)
+
+6. **Photo Moderation Endpoints** (`/events/{event_id}/photos/*`) - *Fully Database Integrated*
+   - ✅ Get paginated photo list (**from DB**)
+   - ✅ Update photo metadata (caption/approval) (**in DB**)
+   - ✅ Remove single photo (**from DB**)
+   - ✅ Bulk delete photos (**from DB**)
+   - ✅ (Placeholder) Bulk download photos
+
+7. **Admin Dashboard Endpoints** (`/admin/*`) - *Fully Database Integrated*
+   - ✅ Get overview stats (**from DB**)
+   - ✅ List/search/filter all events (**from DB**)
+   - ✅ Deep event inspection (**from DB**)
+   - ✅ Update event status (**in DB**)
+   - ✅ Force-delete event (**from DB**)
+   - ✅ Get recent uploads activity feed (**from DB**)
+   - ✅ List host accounts (**from DB**)
+   - ✅ Inspect host profile + events (**from DB**)
+   - ✅ Suspend/reactivate host (**in DB**)
+   - ✅ (Placeholder) Retrieve audit/event logs
+   - ✅ (Placeholder) Export data snapshots
+
+8. **Admin Authentication** (`/admin/auth/*`)
    - ✅ Admin signin
    - ✅ Admin signout
    - ✅ Admin token refresh
 
-5. **Event Management Endpoints** (`/events/*`) - *Initial Placeholder Implementation*
-   - ✅ Create event
-   - ✅ List host's events
-   - ✅ Get event details
-   - ✅ Update event metadata
-   - ✅ Delete event
-   - ✅ (Placeholder) Upload/replace cover image
-   - ✅ (Placeholder) Fetch/generate QR code
-   - ✅ (Placeholder) Trigger ZIP export of photos
-   - ✅ Bulk actions on events
-
-6. **Photo Moderation Endpoints** (`/events/{event_id}/photos/*`) - *Initial Placeholder Implementation*
-   - ✅ Get paginated photo list
-   - ✅ Update photo metadata (caption/approval)
-   - ✅ Remove single photo
-   - ✅ Bulk delete photos
-   - ✅ (Placeholder) Bulk download photos
-
-7. **Admin Dashboard Endpoints** (`/admin/*`) - *Initial Placeholder Implementation*
-   - ✅ Get overview stats
-   - ✅ List/search/filter all events
-   - ✅ Deep event inspection
-   - ✅ Update event status
-   - ✅ Force-delete event
-   - ✅ Get recent uploads activity feed
-   - ✅ List host accounts
-   - ✅ Inspect host profile + events
-   - ✅ Suspend/reactivate host
-   - ✅ (Placeholder) Retrieve audit/event logs
-   - ✅ (Placeholder) Export data snapshots
-
-8. **Configuration**
+9. **Configuration**
    - ✅ Environment variables support
    - ✅ Firebase credentials path configured
    - ✅ CORS enabled for frontend
    - ✅ Admin email list configured
 
-9. **Google Sign-In Support**
-   - ✅ Works out of the box (no special handling needed)
-   - ✅ Same token format as email/password
-   - ✅ Same verification process
+10. **Google Sign-In Support**
+    - ✅ Works out of the box (no special handling needed)
+    - ✅ Same token format as email/password
+    - ✅ Same verification process
 
 ## 🚀 How to Run
 
@@ -88,6 +94,8 @@ source venv/bin/activate  # macOS/Linux
 
 ```bash
 pip install -r requirements.txt
+# Also install pydantic[email] for email validation
+pip install 'pydantic[email]'
 ```
 
 ### 3. Create `.env` File
@@ -98,9 +106,31 @@ Create `backend/.env` with:
 FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAILS=admin@photolog.com
+DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+```
+**Important:** Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+
+### 4. PostgreSQL Database Setup (using Docker)
+
+To run the PostgreSQL database locally for development:
+
+1.  **Install Docker:** If you don't have Docker installed, download and install it from [https://www.docker.com/get-started](https://www.docker.com/get-started).
+2.  **Run PostgreSQL Container:** Open your terminal in the `backend/` directory and run:
+    ```bash
+    docker run --name photolog-db -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d postgres
+    ```
+    This command starts a PostgreSQL container named `photolog-db` with a default user `postgres` and password `mysecretpassword`, mapping port 5432.
+
+### 5. Run Database Migrations (Alembic)
+
+After setting up the database and `.env` file, apply the initial database schema:
+
+```bash
+# Make sure your virtual environment is activated
+alembic upgrade head
 ```
 
-### 4. Start the Server
+### 6. Start the Server
 
 ```bash
 # Option 1: Using uvicorn directly
@@ -110,7 +140,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 python -m app.main
 ```
 
-### 5. Test the API
+### 7. Test the API
 
 Visit http://localhost:8000/docs to see the interactive API documentation.
 
@@ -146,19 +176,17 @@ curl http://localhost:8000/health
 
 ### For Backend Development
 
-1. **Implement Database Integration**:
-   - Choose a database (e.g., SQLite, PostgreSQL).
-   - Replace all mock in-memory databases (`MOCK_DB_EVENTS`, `MOCK_DB_PHOTOS`, `MOCK_DB_USERS`) with real database queries and ORM (e.g., SQLAlchemy, Tortoise ORM).
-   - Implement full CRUD operations for users, events, and photos, persisting data.
-
-2. **Implement File Storage**:
+1. **Implement File Storage**:
    - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
    - Implement actual photo and cover image upload/download logic in the respective endpoints.
 
-3. **Flesh out Placeholder Endpoints**:
+2. **Flesh out Placeholder Endpoints**:
    - Implement actual QR code generation for event share links.
    - Implement background tasks for ZIP exports of photos and system data exports.
    - Implement audit log retrieval from a logging service or database.
+
+3. **Public Visitor Flow**:
+   - Implement endpoints for public event information and photo uploads.
 
 ## 🔍 Testing Your Setup
 
