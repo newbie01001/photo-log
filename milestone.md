@@ -20,22 +20,55 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Resend verification
    - ✅ Forgot password
    - ✅ Reset password
+
+3. **Host Profile Endpoints** (`/me/*`)
    - ✅ Get current user profile (`/me`)
    - ✅ Update profile (`/me`)
    - ✅ Change password (`/me/password`)
 
-3. **Admin Authentication** (`/admin/auth/*`)
+4. **Admin Authentication** (`/admin/auth/*`)
    - ✅ Admin signin
    - ✅ Admin signout
    - ✅ Admin token refresh
 
-4. **Configuration**
+5. **Event Management Endpoints** (`/events/*`) - *Initial Placeholder Implementation*
+   - ✅ Create event
+   - ✅ List host's events
+   - ✅ Get event details
+   - ✅ Update event metadata
+   - ✅ Delete event
+   - ✅ (Placeholder) Upload/replace cover image
+   - ✅ (Placeholder) Fetch/generate QR code
+   - ✅ (Placeholder) Trigger ZIP export of photos
+   - ✅ Bulk actions on events
+
+6. **Photo Moderation Endpoints** (`/events/{event_id}/photos/*`) - *Initial Placeholder Implementation*
+   - ✅ Get paginated photo list
+   - ✅ Update photo metadata (caption/approval)
+   - ✅ Remove single photo
+   - ✅ Bulk delete photos
+   - ✅ (Placeholder) Bulk download photos
+
+7. **Admin Dashboard Endpoints** (`/admin/*`) - *Initial Placeholder Implementation*
+   - ✅ Get overview stats
+   - ✅ List/search/filter all events
+   - ✅ Deep event inspection
+   - ✅ Update event status
+   - ✅ Force-delete event
+   - ✅ Get recent uploads activity feed
+   - ✅ List host accounts
+   - ✅ Inspect host profile + events
+   - ✅ Suspend/reactivate host
+   - ✅ (Placeholder) Retrieve audit/event logs
+   - ✅ (Placeholder) Export data snapshots
+
+8. **Configuration**
    - ✅ Environment variables support
    - ✅ Firebase credentials path configured
    - ✅ CORS enabled for frontend
    - ✅ Admin email list configured
 
-5. **Google Sign-In Support**
+9. **Google Sign-In Support**
    - ✅ Works out of the box (no special handling needed)
    - ✅ Same token format as email/password
    - ✅ Same verification process
@@ -113,20 +146,19 @@ curl http://localhost:8000/health
 
 ### For Backend Development
 
-1. **Add Database** (when ready):
-   - Choose SQLite or PostgreSQL
-   - Create user profile storage
-   - Update endpoints to save/load from database
+1. **Implement Database Integration**:
+   - Choose a database (e.g., SQLite, PostgreSQL).
+   - Replace all mock in-memory databases (`MOCK_DB_EVENTS`, `MOCK_DB_PHOTOS`, `MOCK_DB_USERS`) with real database queries and ORM (e.g., SQLAlchemy, Tortoise ORM).
+   - Implement full CRUD operations for users, events, and photos, persisting data.
 
-2. **Add Event Endpoints**:
-   - Implement `/events/*` endpoints
-   - Add photo upload handling
-   - Implement QR code generation
+2. **Implement File Storage**:
+   - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
+   - Implement actual photo and cover image upload/download logic in the respective endpoints.
 
-3. **Add Admin Dashboard Endpoints**:
-   - Implement `/admin/*` endpoints
-   - Add user management
-   - Add event moderation
+3. **Flesh out Placeholder Endpoints**:
+   - Implement actual QR code generation for event share links.
+   - Implement background tasks for ZIP exports of photos and system data exports.
+   - Implement audit log retrieval from a logging service or database.
 
 ## 🔍 Testing Your Setup
 
@@ -159,7 +191,7 @@ curl -X POST http://localhost:8000/auth/signin \
 
 ```bash
 # Get current user (requires token in header)
-curl http://localhost:8000/auth/me \
+curl http://localhost:8000/me \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN"
 ```
 

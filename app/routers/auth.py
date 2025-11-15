@@ -11,10 +11,8 @@ from app.models.auth import (
     VerifyEmailRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    UpdateProfileRequest,
     MessageResponse,
 )
-from app.dependencies import get_current_user
 from app.services.firebase import verify_firebase_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -29,18 +27,24 @@ async def signup(request: TokenRequest):
     Frontend handles Firebase signup directly (email/password or Google OAuth),
     then sends the ID token here. Backend verifies the token and returns user info.
     """
-    # Verify the Firebase token
-    user_info = verify_firebase_token(request.token)
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during signup: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Extract user information from token
     user_response = UserResponse(
         uid=user_info["uid"],
         email=user_info.get("email"),
-        email_verified=user_info.get("email_verified", False),
+        # email_verified defaults to False if not present in user_info
+        email_verified=user_info.get("email_verified", False), 
         name=user_info.get("name"),
     )
     
-    # Later: Create user profile in database here
+    # TODO: Create user profile in database here (e.g., store additional profile data)
     # For now, just return info from token
     
     return SigninResponse(
@@ -58,10 +62,15 @@ async def signin(request: TokenRequest):
     Frontend handles Firebase signin directly (email/password or Google OAuth),
     then sends the ID token here. Backend verifies the token and returns user info.
     """
-    # Verify the Firebase token
-    user_info = verify_firebase_token(request.token)
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during signin: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Extract user information from token
     user_response = UserResponse(
         uid=user_info["uid"],
         email=user_info.get("email"),
@@ -69,7 +78,7 @@ async def signin(request: TokenRequest):
         name=user_info.get("name"),
     )
     
-    # Later: Check if user exists in database, create if needed
+    # TODO: Check if user exists in database, create if needed (e.g., first-time signin after signup)
     # For now, just return info from token
     
     return SigninResponse(
@@ -84,7 +93,7 @@ async def signout():
     Sign out - invalidate session/token.
     
     Frontend handles Firebase signout (revokes token client-side).
-    Backend just returns success.
+    Backend just returns success. No token invalidation logic needed on backend if using JWTs.
     """
     return MessageResponse(message="Signed out successfully")
 
@@ -96,10 +105,15 @@ async def refresh(request: TokenRequest):
     
     Frontend gets new token from Firebase, backend verifies it.
     """
-    # Verify the new Firebase token
-    user_info = verify_firebase_token(request.token)
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during refresh: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Extract user information from token
     user_response = UserResponse(
         uid=user_info["uid"],
         email=user_info.get("email"),
@@ -114,56 +128,75 @@ async def refresh(request: TokenRequest):
 
 
 @router.post("/verify-email", response_model=MessageResponse)
-async def verify_email(request: VerifyEmailRequest):
+async def verify_email_confirm(request: VerifyEmailRequest): # Renamed to avoid confusion with local variable
     """
-    Confirm email verification.
+    Confirm email verification status.
     
-    Frontend handles email verification with Firebase.
-    Backend receives verified token and confirms verification.
+    Frontend handles email verification flow with Firebase.
+    Backend receives a token (after Firebase has marked email as verified) and confirms verification.
     """
-    # Verify the token (which already has updated email_verified status)
-    user_info = verify_firebase_token(request.token)
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during email verification: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Later: Update user's email_verified status in database
-    # For now, token already contains the updated status
+    # TODO: Update user's email_verified status in database if applicable
+    # For now, we assume the token already contains the updated status
     
+    if not user_info.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is not marked as verified in the provided token."
+        )
+
     return MessageResponse(message="Email verified successfully")
 
 
 @router.post("/resend-verification", response_model=MessageResponse)
-async def resend_verification():
+async def resend_verification_link(): # Renamed for clarity
     """
-    Resend email verification link.
+    Request a new email verification link.
     
-    Frontend calls Firebase to resend verification email.
-    Backend just returns success.
+    Frontend calls Firebase to resend the verification email to the user.
+    Backend just acknowledges the request.
     """
+    # TODO: Optionally, add rate limiting or user-specific logic if desired.
     return MessageResponse(message="Verification email sent")
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
-async def forgot_password(request: ForgotPasswordRequest):
+async def forgot_password_request(request: ForgotPasswordRequest): # Renamed for clarity
     """
-    Send password reset email.
+    Initiate the forgot password flow by sending a reset email.
     
-    Frontend calls Firebase to send password reset email.
-    Backend just returns success.
+    Frontend handles the actual password reset email sending via Firebase.
+    Backend just acknowledges the request for the specific email.
     """
-    # Frontend handles the actual password reset email sending via Firebase
-    return MessageResponse(message="Password reset email sent")
+    # TODO: Optionally, add rate limiting or user-specific logic.
+    return MessageResponse(message="Password reset email sent to " + request.email) # Added email to response message
 
 
 @router.post("/reset-password", response_model=MessageResponse)
-async def reset_password(request: ResetPasswordRequest):
+async def reset_password_confirm(request: ResetPasswordRequest): # Renamed for clarity
     """
-    Confirm password reset and set new password.
+    Confirm password reset and set new password after a successful reset on the frontend.
     
     Frontend handles password reset with Firebase.
     Backend receives new token after reset and verifies it.
     """
-    # Verify the new token after password reset
-    verify_firebase_token(request.token)
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during password reset confirmation: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # TODO: Optionally, update any relevant database fields if needed after password reset.
     
     return MessageResponse(message="Password reset successfully")
-
-

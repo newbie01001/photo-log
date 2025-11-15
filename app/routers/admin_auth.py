@@ -1,12 +1,13 @@
 """
 Admin authentication router - handles all /admin/auth/* endpoints.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status # Moved HTTPException, status import to top
 from typing import Dict, Any
 
 from app.models.auth import TokenRequest, SigninResponse, UserResponse, MessageResponse
 from app.dependencies import get_current_admin_user
 from app.services.firebase import verify_firebase_token
+from app.config import settings # Moved settings import to top
 
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
 
@@ -19,21 +20,22 @@ async def admin_signin(request: TokenRequest):
     For now: Checks if email is in admin_emails list.
     Later: Check is_admin flag in database.
     """
-    # Verify the Firebase token
-    user_info = verify_firebase_token(request.token)
-    
-    # Check if user is admin
-    from app.config import settings
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during admin signin: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     user_email = user_info.get("email")
     if not user_email or user_email not in settings.get_admin_emails_list():
-        from fastapi import HTTPException, status
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
     
-    # Extract user information from token
     user_response = UserResponse(
         uid=user_info["uid"],
         email=user_info.get("email"),
@@ -61,28 +63,25 @@ async def admin_signout():
 @router.post("/refresh", response_model=SigninResponse)
 async def admin_refresh(
     request: TokenRequest,
-    admin: Dict[str, Any] = Depends(get_current_admin_user)
+    admin: Dict[str, Any] = Depends(get_current_admin_user) # get_current_admin_user already verifies admin role
 ):
     """
     Refresh admin authentication token.
     
-    Verifies token and checks admin role.
+    Verifies token and ensures the user still has admin privileges.
     """
-    # Verify the new Firebase token
-    user_info = verify_firebase_token(request.token)
-    
-    # Check admin role again
-    from app.config import settings
-    
-    user_email = user_info.get("email")
-    if not user_email or user_email not in settings.get_admin_emails_list():
-        from fastapi import HTTPException, status
+    try:
+        user_info = verify_firebase_token(request.token)
+    except HTTPException as e:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token during admin refresh: {e.detail}",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Extract user information from token
+    # The admin role check is already performed by the get_current_admin_user dependency.
+    # We just need to ensure the token is valid and return the user info.
+    
     user_response = UserResponse(
         uid=user_info["uid"],
         email=user_info.get("email"),

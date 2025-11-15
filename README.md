@@ -96,15 +96,52 @@ The API will be available at:
 - `POST /auth/resend-verification` - Resend verification email
 - `POST /auth/forgot-password` - Request password reset
 - `POST /auth/reset-password` - Reset password
-- `GET /auth/me` - Get current user profile (protected)
-- `PATCH /auth/me` - Update user profile (protected)
-- `PATCH /auth/me/password` - Change password (protected)
+
+### Host Profile (`/me/*`)
+
+- `GET /me` - Get current user profile (protected)
+- `PATCH /me` - Update user profile (protected)
+- `PATCH /me/password` - Change password (protected)
+
+### Events (`/events/*`)
+
+- `POST /events` - Create a new event
+- `GET /events` - List all events for the current host
+- `GET /events/{event_id}` - Get details for a specific event
+- `PATCH /events/{event_id}` - Update an event's metadata
+- `DELETE /events/{event_id}` - Delete an event
+- `POST /events/{event_id}/cover` - (Placeholder) Upload a cover image
+- `GET /events/{event_id}/qr` - (Placeholder) Get a QR code for the event
+- `POST /events/{event_id}/download` - (Placeholder) Trigger a ZIP export of all photos
+- `POST /events/actions/bulk` - Perform bulk actions on events
+
+### Photos (Host Moderation) (`/events/{event_id}/photos/*`)
+
+- `GET /events/{event_id}/photos` - Get a paginated list of photos for an event
+- `PATCH /events/{event_id}/photos/{photo_id}` - Update photo metadata (caption, approval)
+- `DELETE /events/{event_id}/photos/{photo_id}` - Delete a single photo
+- `POST /events/{event_id}/photos/bulk-delete` - Delete multiple photos
+- `POST /events/{event_id}/photos/bulk-download` - (Placeholder) Trigger a download of selected photos
 
 ### Admin Authentication (`/admin/auth/*`)
 
 - `POST /admin/auth/signin` - Admin login
 - `POST /admin/auth/signout` - Admin sign out
 - `POST /admin/auth/refresh` - Refresh admin token
+
+### Admin Dashboard (`/admin/*`)
+
+- `GET /admin/overview` - Get system-wide statistics
+- `GET /admin/events` - List all events in the system
+- `GET /admin/events/{event_id}` - Inspect a specific event
+- `PATCH /admin/events/{event_id}/status` - Update an event's status
+- `DELETE /admin/events/{event_id}` - Force-delete an event
+- `GET /admin/uploads/recent` - Get a feed of recent photo uploads
+- `GET /admin/users` - List all users
+- `GET /admin/users/{user_id}` - Inspect a specific user
+- `PATCH /admin/users/{user_id}/status` - Suspend or reactivate a user
+- `GET /admin/logs` - (Placeholder) Retrieve audit logs
+- `POST /admin/system/export` - (Placeholder) Trigger a system data export
 
 ### Utilities
 
@@ -138,7 +175,7 @@ curl -X POST http://localhost:8000/auth/signin \
   -d '{"token": "YOUR_FIREBASE_ID_TOKEN"}'
 
 # Get current user (protected route)
-curl http://localhost:8000/auth/me \
+curl http://localhost:8000/me \
   -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN"
 ```
 
@@ -152,12 +189,22 @@ backend/
 │   ├── config.py             # Configuration and settings
 │   ├── dependencies.py       # Auth dependencies
 │   ├── models/
+│   │   ├── __init__.py
+│   │   ├── admin.py         # Admin dashboard models
 │   │   ├── auth.py          # Auth request/response models
+│   │   ├── event.py         # Event models
+│   │   ├── photo.py         # Photo models
 │   │   └── user.py          # User models
 │   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── admin.py         # Admin dashboard endpoints
+│   │   ├── admin_auth.py    # Admin auth endpoints
 │   │   ├── auth.py          # Auth endpoints
-│   │   └── admin_auth.py    # Admin auth endpoints
+│   │   ├── events.py        # Event management endpoints
+│   │   ├── photos.py        # Photo moderation endpoints
+│   │   └── profiles.py      # User profile endpoints
 │   └── services/
+│       ├── __init__.py
 │       └── firebase.py      # Firebase Admin SDK service
 ├── firebase_account_services.json  # Firebase credentials (keep secret!)
 ├── requirements.txt
@@ -175,11 +222,17 @@ backend/
 
 ## Next Steps
 
-1. Add database integration (SQLite or PostgreSQL)
-2. Implement user profile storage
-3. Add event management endpoints
-4. Implement photo upload and storage
-5. Add admin dashboard endpoints
+1. **Implement Database Logic**:
+   - Integrate a database (e.g., SQLite, PostgreSQL).
+   - Replace all mock in-memory databases (`MOCK_DB_*`) with real database queries.
+   - Implement full CRUD operations for users, events, and photos.
+2. **Implement File Storage**:
+   - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
+   - Implement photo upload/download logic in the respective endpoints.
+3. **Flesh out Placeholder Endpoints**:
+   - Implement QR code generation.
+   - Implement background tasks for ZIP exports and system data exports.
+   - Implement audit logging.
 
 ## Troubleshooting
 

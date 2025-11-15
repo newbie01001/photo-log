@@ -59,17 +59,20 @@ def verify_firebase_token(token: str) -> Dict[str, Any]:
         - uid: Firebase user ID
         - email: User email
         - email_verified: Whether email is verified
-        - Additional claims from token
+        - name: User's display name
+        - firebase_claims: All claims present in the decoded token
         
     Raises:
         HTTPException: If token is invalid, expired, or revoked
     """
     if not _firebase_initialized:
+        # This should ideally be handled at application startup, but this acts as a safeguard.
+        logger.warning("Firebase Admin SDK not initialized, attempting to initialize now.")
         initialize_firebase()
     
     try:
         # Verify the token
-        decoded_token = auth.verify_id_token(token)
+        decoded_token: Dict[str, Any] = auth.verify_id_token(token)
         
         # Extract user information
         user_info = {
@@ -82,26 +85,26 @@ def verify_firebase_token(token: str) -> Dict[str, Any]:
         
         return user_info
         
-    except auth.InvalidIdTokenError:
-        logger.warning("Invalid Firebase ID token provided")
+    except auth.InvalidIdTokenError as e:
+        logger.warning(f"Invalid Firebase ID token provided: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token"
         )
-    except auth.ExpiredIdTokenError:
-        logger.warning("Expired Firebase ID token provided")
+    except auth.ExpiredIdTokenError as e:
+        logger.warning(f"Expired Firebase ID token provided: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication token has expired"
         )
-    except auth.RevokedIdTokenError:
-        logger.warning("Revoked Firebase ID token provided")
+    except auth.RevokedIdTokenError as e:
+        logger.warning(f"Revoked Firebase ID token provided: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication token has been revoked"
         )
     except Exception as e:
-        logger.error(f"Error verifying Firebase token: {e}")
+        logger.error(f"Unexpected error verifying Firebase token: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error verifying authentication token"

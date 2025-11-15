@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, status, Header
 from typing import Optional, Dict, Any
 
 from app.services.firebase import verify_firebase_token
+from app.config import settings # Moved import to top
 
 
 async def get_current_user(
@@ -42,7 +43,7 @@ async def get_current_user(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format. Expected: Bearer <token>",
+            detail="Invalid authorization header format. Expected: 'Bearer <token>'", # Refined error message
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -55,10 +56,10 @@ async def get_current_admin_user(
     user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    FastAPI dependency to verify user is an admin.
+    FastAPI dependency to verify if the authenticated user has admin privileges.
     
-    For now, checks if email is in admin_emails list.
-    Later: Check is_admin flag in database.
+    Currently, checks if the user's email is in the configured admin_emails list.
+    This will be updated to check an `is_admin` flag in the database once implemented.
     
     Usage:
         @app.get("/admin/protected")
@@ -69,10 +70,8 @@ async def get_current_admin_user(
         user: User info from get_current_user dependency
         
     Returns:
-        User info if admin, otherwise raises HTTPException
+        User info if admin, otherwise raises HTTPException (403 Forbidden)
     """
-    from app.config import settings
-    
     user_email = user.get("email")
     
     if not user_email or user_email not in settings.get_admin_emails_list():
