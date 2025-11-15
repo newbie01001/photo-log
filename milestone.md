@@ -24,8 +24,8 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Token refresh
    - ✅ Email verification
    - ✅ Resend verification
-   - ✅ Forgot password
-   - ✅ Reset password
+   - ✅ Forgot password (Firebase sends reset link via email)
+   - ✅ Reset password (link-based via Firebase)
 
 4. **Host Profile Endpoints** (`/me/*`)
    - ✅ Get current user profile (**from DB**)
@@ -39,9 +39,10 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Update event metadata (**in DB**)
    - ✅ Delete event (**from DB**)
    - ✅ (Placeholder) Upload/replace cover image
-   - ✅ (Placeholder) Fetch/generate QR code
+   - ✅ Generate QR code for event sharing
    - ✅ (Placeholder) Trigger ZIP export of photos
    - ✅ Bulk actions on events (**in DB**)
+   - ✅ Share link generation
 
 6. **Photo Moderation Endpoints** (`/events/{event_id}/photos/*`) - *Fully Database Integrated*
    - ✅ Get paginated photo list (**from DB**)
@@ -79,6 +80,24 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
     - ✅ Same token format as email/password
     - ✅ Same verification process
 
+11. **Email Notifications**
+    - ✅ Welcome emails on user signup
+    - ✅ Photo approval/rejection notifications
+    - ✅ Export ready notifications (ready for integration)
+    - ✅ Gmail SMTP integration
+    - ✅ HTML email templates
+
+12. **Public Visitor Flow**
+    - ✅ Public event viewing (no authentication required)
+    - ✅ Public photo viewing (approved photos only)
+    - ✅ Password-protected event access
+    - ✅ Public photo uploads
+
+13. **QR Code Generation**
+    - ✅ QR code generation for event share links
+    - ✅ Configurable QR code size
+    - ✅ Returns PNG image format
+
 ## 🚀 How to Run
 
 ### 1. Activate Virtual Environment
@@ -105,10 +124,22 @@ Create `backend/.env` with:
 ```env
 FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
-ADMIN_EMAILS=admin@photolog.com
+ADMIN_EMAILS=officialphotolab2025@gmail.com
 DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+
+# Email Configuration (Gmail SMTP)
+EMAIL_ENABLED=true
+EMAIL_FROM=officialphotolab2025@gmail.com
+EMAIL_FROM_NAME=PHOTO LOG
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=officialphotolab2025@gmail.com
+SMTP_PASSWORD=your_gmail_app_password_here
+SMTP_TLS=true
 ```
-**Important:** Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+**Important:** 
+- Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+- For email notifications, see [EMAIL_SETUP.md](./EMAIL_SETUP.md) for Gmail App Password setup.
 
 ### 4. PostgreSQL Database Setup (using Docker)
 
@@ -181,12 +212,13 @@ curl http://localhost:8000/health
    - Implement actual photo and cover image upload/download logic in the respective endpoints.
 
 2. **Flesh out Placeholder Endpoints**:
-   - Implement actual QR code generation for event share links.
    - Implement background tasks for ZIP exports of photos and system data exports.
    - Implement audit log retrieval from a logging service or database.
 
-3. **Public Visitor Flow**:
-   - Implement endpoints for public event information and photo uploads.
+3. **Enhancements**:
+   - Add search and filtering to admin dashboard
+   - Implement event slug system (currently uses event ID)
+   - Add rate limiting for API endpoints
 
 ## 🔍 Testing Your Setup
 
