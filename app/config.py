@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     # Can be set as comma-separated string in .env: ADMIN_EMAILS=admin@photolog.com,admin2@photolog.com
     admin_emails: str = "" # Changed default to empty string for better security
     
+    # Email configuration
+    email_enabled: bool = True
+    email_from: str = "officialphotolab2025@gmail.com"
+    email_from_name: str = "PHOTO LOG"
+    smtp_server: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = "officialphotolab2025@gmail.com"
+    smtp_password: str = ""  # Will be set from .env
+    smtp_tls: bool = True
+    
     def get_admin_emails_list(self) -> List[str]:
         """
         Parses the comma-separated admin_emails string into a list of email addresses.

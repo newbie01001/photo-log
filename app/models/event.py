@@ -61,6 +61,20 @@ class EventResponse(EventBase):
     class Config:
         from_attributes = True
 
+class PublicEventResponse(BaseModel):
+    """Model for public event information (no sensitive data)."""
+    id: str = Field(..., description="The unique identifier for the event.")
+    name: str = Field(..., description="The name of the event.")
+    description: Optional[str] = Field(None, description="A short description of the event.")
+    date: datetime = Field(..., description="The date and time of the event.")
+    cover_image_url: Optional[str] = Field(None, description="URL to the event's cover image.")
+    has_password: bool = Field(..., description="Indicates if the event requires a password.")
+    photo_count: int = Field(0, description="The number of approved photos in the event.")
+    is_active: bool = Field(..., description="Indicates if the event is currently active.")
+
+    class Config:
+        from_attributes = True
+
 class EventListResponse(BaseModel):
     """Model for a paginated list of events."""
     events: List[EventResponse] = Field(..., description="The list of events for the current page.")

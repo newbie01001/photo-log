@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
 from sqlalchemy.orm import Session
+from app.dependencies import get_current_user
 
 from app.models.event import (
     EventCreate,

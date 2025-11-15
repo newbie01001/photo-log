@@ -7,7 +7,7 @@ import logging
 
 from app.config import settings
 from app.services.firebase import initialize_firebase
-from app.routers import auth, admin_auth, photos, profiles, events, admin
+from app.routers import auth, admin_auth, photos, profiles, events, admin, public
 
 # Configure logging
 logging.basicConfig(

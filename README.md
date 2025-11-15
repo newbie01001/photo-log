@@ -7,6 +7,9 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 - Firebase Authentication (Email/Password + Google Sign-In)
 - Token verification and user management
 - Admin authentication
+- Email notifications (Welcome, Photo Approval, Export Ready)
+- Public visitor flow for event photo sharing
+- QR code generation for event sharing
 - RESTful API endpoints
 - CORS enabled for frontend integration
 
@@ -19,6 +22,8 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 - **Firebase Admin SDK** - Token verification and user management
 - **Pydantic** - Data validation and settings management
 - **Uvicorn** - ASGI server
+- **Jinja2** - Email template rendering
+- **qrcode** - QR code generation for event sharing
 
 ## Setup Instructions
 
@@ -65,8 +70,20 @@ FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAILS=admin@photolog.com
 DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+
+# Email Configuration (Gmail SMTP)
+EMAIL_ENABLED=true
+EMAIL_FROM=officialphotolab2025@gmail.com
+EMAIL_FROM_NAME=PHOTO LOG
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=officialphotolab2025@gmail.com
+SMTP_PASSWORD=your_gmail_app_password_here
+SMTP_TLS=true
 ```
-**Important:** Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+**Important:** 
+- Ensure the `DATABASE_URL` matches the credentials used when starting your Docker container.
+- For email notifications, you need a Gmail App Password. See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for setup instructions.
 
 ### 5. Run Database Migrations (Alembic)
 
@@ -107,10 +124,12 @@ The API will be available at:
 - ✅ Email/Password signup and signin
 - ✅ Google Sign-In (OAuth)
 - ✅ Email verification
-- ✅ Password reset
+- ✅ Password reset (link-based via Firebase)
 - ✅ Token refresh
 
 **Note**: The backend doesn't distinguish between email/password and Google sign-in - both methods return Firebase ID tokens that are verified the same way.
+
+**Password Reset**: Uses Firebase's built-in password reset flow. Firebase sends a reset link to the user's email. The backend verifies the token after the password is reset.
 
 ## API Endpoints
 
@@ -122,8 +141,8 @@ The API will be available at:
 - `POST /auth/refresh` - Refresh authentication token
 - `POST /auth/verify-email` - Verify email address
 - `POST /auth/resend-verification` - Resend verification email
-- `POST /auth/forgot-password` - Request password reset
-- `POST /auth/reset-password` - Reset password
+- `POST /auth/forgot-password` - Request password reset (Firebase sends reset link via email)
+- `POST /auth/reset-password` - Confirm password reset (after user resets via Firebase link)
 
 ### Host Profile (`/me/*`)
 
@@ -139,7 +158,7 @@ The API will be available at:
 - `PATCH /events/{event_id}` - Update an event's metadata (**in DB**)
 - `DELETE /events/{event_id}` - Delete an event (**from DB**)
 - `POST /events/{event_id}/cover` - (Placeholder) Upload a cover image
-- `GET /events/{event_id}/qr` - (Placeholder) Get a QR code for the event
+- `GET /events/{event_id}/qr` - Generate QR code for event sharing
 - `POST /events/{event_id}/download` - (Placeholder) Trigger a ZIP export of all photos
 - `POST /events/actions/bulk` - Perform bulk actions on events (**in DB**)
 
@@ -153,7 +172,10 @@ The API will be available at:
 
 ### Public Visitor Flow (`/public/*`)
 
-- `POST /public/events/{event_slug}/photos` - (Placeholder) Upload a photo to a public event
+- `GET /public/events/{slug}` - Get public event information
+- `GET /public/events/{slug}/photos` - Get approved photos for public viewing (paginated)
+- `POST /public/events/{slug}/verify-password` - Verify event password
+- `POST /public/events/{slug}/photos` - Upload a photo to a public event
 
 ### Admin Authentication (`/admin/auth/*`)
 
@@ -239,7 +261,14 @@ backend/
 │   │   └── profiles.py      # User profile endpoints
 │   └── services/
 │       ├── __init__.py
-│       └── firebase.py      # Firebase Admin SDK service
+│       ├── firebase.py      # Firebase Admin SDK service
+│       └── email.py         # Email notification service
+│   └── templates/
+│       └── emails/          # Email HTML templates
+│           ├── welcome.html
+│           ├── photo_approved.html
+│           ├── photo_rejected.html
+│           └── export_ready.html
 ├── alembic/                  # Alembic migration scripts
 │   ├── versions/
 │   └── env.py
@@ -258,17 +287,28 @@ backend/
 - ✅ CORS is configured to only allow your frontend domain
 - ✅ Admin access is restricted to configured admin emails
 
+## Email Notifications
+
+The backend supports email notifications via Gmail SMTP:
+
+- ✅ **Welcome emails** - Sent automatically when users sign up
+- ✅ **Photo approval notifications** - Sent when photos are approved/rejected
+- ✅ **Export completion notifications** - Ready for use when export feature is implemented
+
+See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for detailed setup instructions.
+
 ## Next Steps
 
 1. **Implement File Storage**:
    - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
    - Implement actual photo and cover image upload/download logic in the respective endpoints.
 2. **Flesh out Placeholder Endpoints**:
-   - Implement actual QR code generation for event share links.
    - Implement background tasks for ZIP exports and system data exports.
    - Implement audit log retrieval from a logging service or database.
-3. **Public Visitor Flow**:
-   - Implement endpoints for public event information and photo uploads.
+3. **Enhancements**:
+   - Add search and filtering to admin dashboard
+   - Implement event slug system (currently uses event ID)
+   - Add rate limiting for API endpoints
 
 ## Troubleshooting
 
@@ -285,6 +325,13 @@ Make sure `firebase_account_services.json` is in the `backend/` directory and th
 ### CORS errors
 
 Update `FRONTEND_URL` in `.env` to match your frontend URL.
+
+### Email not sending
+
+- Check that `SMTP_PASSWORD` is set correctly (Gmail App Password, not regular password)
+- Verify `EMAIL_ENABLED=true` in `.env`
+- Ensure 2-Step Verification is enabled on your Google account
+- See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for troubleshooting
 
 ## License
 

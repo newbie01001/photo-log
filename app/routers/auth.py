@@ -4,6 +4,7 @@ Authentication router - handles all /auth/* endpoints.
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 from sqlalchemy.orm import Session
+import logging
 
 from app.models.auth import (
     TokenRequest,
@@ -15,8 +16,11 @@ from app.models.auth import (
     MessageResponse,
 )
 from app.services.firebase import verify_firebase_token
+from app.services.email import email_service
 from app.database import get_db
 from app.crud import get_or_create_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -38,6 +42,15 @@ async def signup(request: TokenRequest, db: Session = Depends(get_db)):
         )
     
     user = get_or_create_user(db, user_info)
+    
+    # Send welcome email (non-blocking)
+    try:
+        email_service.send_welcome_email(
+            user_email=user.email,
+            user_name=user.name
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send welcome email to {user.email}: {e}")
     
     user_response = UserResponse(
         uid=user.id,
