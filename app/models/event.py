@@ -17,6 +17,8 @@ class Event(Base):
     date = Column(DateTime(timezone=True), nullable=False)
     password = Column(String, nullable=True)
     cover_image_url = Column(String, nullable=True)
+    cover_thumbnail_url = Column(String, nullable=True)
+    cover_image_file_size = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -32,6 +34,7 @@ class EventBase(BaseModel):
     date: datetime = Field(..., description="The date and time of the event.")
     password: Optional[str] = Field(None, min_length=4, max_length=50, description="Optional password for public access to the event.")
     cover_image_url: Optional[str] = Field(None, description="URL to the event's cover image.")
+    cover_thumbnail_url: Optional[str] = Field(None, description="URL to the event's cover image thumbnail.")
 
 class EventCreate(EventBase):
     """Model for creating a new event."""
@@ -44,6 +47,7 @@ class EventUpdate(BaseModel):
     date: Optional[datetime] = Field(None, description="The new date and time of the event.")
     password: Optional[str] = Field(None, min_length=4, max_length=50, description="The new password for the event.")
     cover_image_url: Optional[str] = Field(None, description="The new cover image URL for the event.")
+    cover_thumbnail_url: Optional[str] = Field(None, description="The new cover image thumbnail URL for the event.")
     is_active: Optional[bool] = Field(None, description="Set to true to make the event active, false to deactivate.")
     is_archived: Optional[bool] = Field(None, description="Set to true to archive the event.")
 
@@ -57,6 +61,7 @@ class EventResponse(EventBase):
     is_archived: bool = Field(..., description="Indicates if the event is archived.")
     photo_count: int = Field(0, description="The number of photos in the event.")
     share_link: Optional[str] = Field(None, description="The public, shareable link for the event.")
+    cover_image_file_size: Optional[int] = Field(None, description="The size of the event's cover image in bytes.")
 
     class Config:
         from_attributes = True
@@ -65,9 +70,10 @@ class PublicEventResponse(BaseModel):
     """Model for public event information (no sensitive data)."""
     id: str = Field(..., description="The unique identifier for the event.")
     name: str = Field(..., description="The name of the event.")
-    description: Optional[str] = Field(None, description="A short description of the event.")
+    description: Optional[str] = Field(None, max_length=500, description="A short description of the event.")
     date: datetime = Field(..., description="The date and time of the event.")
     cover_image_url: Optional[str] = Field(None, description="URL to the event's cover image.")
+    cover_thumbnail_url: Optional[str] = Field(None, description="URL to the event's cover image thumbnail.")
     has_password: bool = Field(..., description="Indicates if the event requires a password.")
     photo_count: int = Field(0, description="The number of approved photos in the event.")
     is_active: bool = Field(..., description="Indicates if the event is currently active.")

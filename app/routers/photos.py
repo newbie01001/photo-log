@@ -21,6 +21,7 @@ from app.database import get_db
 from app.routers.events import verify_event_ownership
 from app.models.auth import MessageResponse
 from app.services.email import email_service
+from app.services.cloudinary import delete_image
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,20 @@ async def delete_photo(
             detail=f"Photo with ID '{photo_id}' not found in event '{event_id}'."
         )
     
+    # Extract public_id from Cloudinary URL
+    # Assuming URL format like: https://res.cloudinary.com/<cloud_name>/image/upload/v<version>/<public_id>.<extension>
+    try:
+        public_id = "/".join(photo.url.split('/')[-2:]).split('.')[0]
+        delete_image(public_id)
+    except Exception as e:
+        logger.error(f"Failed to delete image from Cloudinary for photo {photo_id}: {e}")
+        # Decide whether to raise an HTTPException or just log and proceed.
+        # For now, we'll log and proceed to delete the DB record to avoid orphaned DB entries.
+        # raise HTTPException(
+        #     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #     detail=f"Failed to delete image from storage: {str(e)}"
+        # )
+    
     db.delete(photo)
     db.commit()
     
@@ -160,6 +175,17 @@ async def bulk_delete_photos(
         PhotoModel.event_id == event_id
     )
     
+    # Fetch photos to get their Cloudinary URLs
+    photos_to_delete = query.all()
+    
+    for photo in photos_to_delete:
+        try:
+            public_id = "/".join(photo.url.split('/')[-2:]).split('.')[0]
+            delete_image(public_id)
+        except Exception as e:
+            logger.error(f"Failed to delete image from Cloudinary for photo {photo.id}: {e}")
+            # Log the error but continue with other deletions and DB record deletion
+            
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
             

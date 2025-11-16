@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     
     # Frontend configuration
     frontend_url: str = "http://localhost:5173"
+
+    # Cloudinary configuration
+    cloudinary_url: str = ""
     
     # Admin emails (hardcoded for now, move to database later)
     # Can be set as comma-separated string in .env: ADMIN_EMAILS=admin@photolog.com,admin2@photolog.com

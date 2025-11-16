@@ -9,6 +9,8 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 - Admin authentication
 - Email notifications (Welcome, Photo Approval, Export Ready)
 - Public visitor flow for event photo sharing
+- User profile pictures (avatars)
+- 1GB upload limit per authenticated user (host/admin)
 - QR code generation for event sharing
 - RESTful API endpoints
 - CORS enabled for frontend integration
@@ -19,6 +21,7 @@ FastAPI backend for PhotoLog - Event photo sharing platform with Firebase authen
 - **PostgreSQL** - Robust relational database
 - **SQLAlchemy** - Python SQL Toolkit and Object Relational Mapper
 - **Alembic** - Database migrations tool
+- **Cloudinary** - Cloud-based image and video management
 - **Firebase Admin SDK** - Token verification and user management
 - **Pydantic** - Data validation and settings management
 - **Uvicorn** - ASGI server
@@ -70,6 +73,9 @@ FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAILS=admin@photolog.com
 DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+
+# Cloudinary URL for image storage
+CLOUDINARY_URL="cloudinary://<api_key>:<api_secret>@<cloud_name>"
 
 # Email Configuration (Gmail SMTP)
 EMAIL_ENABLED=true
@@ -146,8 +152,9 @@ The API will be available at:
 
 ### Host Profile (`/me/*`)
 
-- `GET /me` - Get current user profile (**from DB**, protected)
-- `PATCH /me` - Update user profile (**in DB**, protected)
+- `GET /me` - Get current user profile (**from DB**, protected, includes avatar URLs)
+- `PATCH /me` - Update user profile (**in DB**, protected, can update name and avatar URLs)
+- `POST /me/avatar` - Upload or replace user's avatar (**to Cloudinary**, protected)
 - `PATCH /me/password` - Change password (protected)
 
 ### Events (`/events/*`)
@@ -157,7 +164,7 @@ The API will be available at:
 - `GET /events/{event_id}` - Get details for a specific event (**from DB**)
 - `PATCH /events/{event_id}` - Update an event's metadata (**in DB**)
 - `DELETE /events/{event_id}` - Delete an event (**from DB**)
-- `POST /events/{event_id}/cover` - (Placeholder) Upload a cover image
+- `POST /events/{event_id}/cover` - Upload a cover image (stores full image and thumbnail URL, records file size)
 - `GET /events/{event_id}/qr` - Generate QR code for event sharing
 - `POST /events/{event_id}/download` - (Placeholder) Trigger a ZIP export of all photos
 - `POST /events/actions/bulk` - Perform bulk actions on events (**in DB**)
@@ -166,8 +173,8 @@ The API will be available at:
 
 - `GET /events/{event_id}/photos` - Get a paginated list of photos for an event (**from DB**)
 - `PATCH /events/{event_id}/photos/{photo_id}` - Update photo metadata (caption, approval) (**in DB**)
-- `DELETE /events/{event_id}/photos/{photo_id}` - Delete a single photo (**from DB**)
-- `POST /events/{event_id}/photos/bulk-delete` - Delete multiple photos (**from DB**)
+- `DELETE /events/{event_id}/photos/{photo_id}` - Delete a single photo (**from DB and Cloudinary**)
+- `POST /events/{event_id}/photos/bulk-delete` - Delete multiple photos (**from DB and Cloudinary**)
 - `POST /events/{event_id}/photos/bulk-download` - (Placeholder) Trigger a download of selected photos
 
 ### Public Visitor Flow (`/public/*`)
@@ -175,7 +182,7 @@ The API will be available at:
 - `GET /public/events/{slug}` - Get public event information
 - `GET /public/events/{slug}/photos` - Get approved photos for public viewing (paginated)
 - `POST /public/events/{slug}/verify-password` - Verify event password
-- `POST /public/events/{slug}/photos` - Upload a photo to a public event
+- `POST /public/events/{slug}/photos` - Upload a photo to a public event (counts towards host's 1GB limit, stores unique public uploader ID)
 
 ### Admin Authentication (`/admin/auth/*`)
 
@@ -185,11 +192,11 @@ The API will be available at:
 
 ### Admin Dashboard (`/admin/*`)
 
-- `GET /admin/overview` - Get system-wide statistics (**from DB**)
+- `GET /admin/overview` - Get system-wide statistics (**from DB**, includes accurate storage calculation)
 - `GET /admin/events` - List all events in the system (**from DB**)
 - `GET /admin/events/{event_id}` - Inspect a specific event (**from DB**)
 - `PATCH /admin/events/{event_id}/status` - Update an event's status (**in DB**)
-- `DELETE /admin/events/{event_id}` - Force-delete an event (**from DB**)
+- `DELETE /admin/events/{event_id}` - Force-delete an event (**from DB and Cloudinary, including all associated photos and cover image**)
 - `GET /admin/uploads/recent` - Get a feed of recent photo uploads (**from DB**)
 - `GET /admin/users` - List all users (**from DB**)
 - `GET /admin/users/{user_id}` - Inspect a specific user (**from DB**)
@@ -261,6 +268,7 @@ backend/
 │   │   └── profiles.py      # User profile endpoints
 │   └── services/
 │       ├── __init__.py
+│       ├── cloudinary.py    # Cloudinary image upload service
 │       ├── firebase.py      # Firebase Admin SDK service
 │       └── email.py         # Email notification service
 │   └── templates/
@@ -299,16 +307,30 @@ See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for detailed setup instructions.
 
 ## Next Steps
 
-1. **Implement File Storage**:
-   - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
-   - Implement actual photo and cover image upload/download logic in the respective endpoints.
-2. **Flesh out Placeholder Endpoints**:
+1. **Flesh out Placeholder Endpoints**:
    - Implement background tasks for ZIP exports and system data exports.
    - Implement audit log retrieval from a logging service or database.
-3. **Enhancements**:
+2. **Enhancements**:
    - Add search and filtering to admin dashboard
    - Implement event slug system (currently uses event ID)
    - Add rate limiting for API endpoints
+
+## Completed
+
+- **File Storage & Management**:
+  - Integrated Cloudinary for photo, event cover, and user avatar uploads.
+  - Implemented automatic thumbnail generation for event covers and user avatars.
+  - Ensured Cloudinary asset deletion upon corresponding database record removal (photos, event covers, user avatars).
+  - Added file size tracking for all uploaded assets.
+- **Upload Limits**:
+  - Implemented a 1GB upload limit per authenticated user (hosts/admins), encompassing all their direct uploads and public uploads to their events.
+- **User Avatars**:
+  - Added functionality for users to upload and manage their profile pictures (avatars).
+- **Data Consistency**:
+  - Updated database schemas and Pydantic models to reflect all new fields and functionalities.
+  - Applied necessary Alembic migrations.
+- **Documentation**:
+  - Updated `README.md` to reflect all new features and changes.
 
 ## Troubleshooting
 

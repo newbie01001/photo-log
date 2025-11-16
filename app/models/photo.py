@@ -20,7 +20,9 @@ class Photo(Base):
     caption = Column(Text, nullable=True)
     approved = Column(Boolean, default=False, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
-    uploaded_by = Column(String, nullable=True) # Could be a user ID or an anonymous identifier
+    uploaded_by = Column(String, nullable=True) # Stores the host's ID for public uploads, or the user's ID for authenticated uploads.
+    public_uploader_identifier = Column(String, nullable=True) # Unique identifier for anonymous public uploader
+    file_size = Column(String, nullable=True)
 
     event = relationship("Event", back_populates="photos")
 
@@ -47,7 +49,9 @@ class PhotoResponse(BaseModel):
     caption: Optional[str] = Field(None, description="The caption for the photo.")
     approved: bool = Field(False, description="Indicates if the photo has been approved for public viewing.")
     uploaded_at: datetime = Field(..., description="The timestamp when the photo was uploaded.")
-    uploaded_by: Optional[str] = Field(None, description="Identifier of the user who uploaded the photo (e.g., email or anonymous ID).")
+    uploaded_by: Optional[str] = Field(None, description="Identifier of the user who uploaded the photo (for authenticated uploads) or the host (for public uploads).")
+    public_uploader_identifier: Optional[str] = Field(None, description="Unique identifier for the anonymous public uploader.")
+    file_size: Optional[int] = Field(None, description="The size of the photo in bytes.")
 
     class Config:
         from_attributes = True

@@ -24,6 +24,7 @@ from app.models.event import EventUpdate, Event as EventModel
 from app.models.user import UserProfile, User as UserModel
 from app.models.photo import Photo as PhotoModel
 from app.database import get_db
+from app.services.cloudinary import delete_image
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -41,8 +42,11 @@ async def get_overview_stats(
     total_users = db.query(UserModel).count()
     total_photos = db.query(PhotoModel).count()
     
-    # TODO: Implement actual storage calculation
-    total_storage_gb = round(total_photos * 0.005, 2) # Assuming 5MB per photo
+    # Calculate total storage from photos and event covers
+    total_photo_storage = db.query(func.sum(PhotoModel.file_size)).scalar() or 0
+    total_cover_storage = db.query(func.sum(EventModel.cover_image_file_size)).scalar() or 0
+    total_storage_bytes = total_photo_storage + total_cover_storage
+    total_storage_gb = round(total_storage_bytes / (1024**3), 4) if total_storage_bytes else 0
 
     return OverviewStats(
         total_events=total_events,
@@ -150,10 +154,27 @@ async def force_delete_event(
     """
     Force-delete an event from the system.
     """
-    event = db.query(EventModel).filter(EventModel.id == event_id).first()
+    event = db.query(EventModel).options(joinedload(EventModel.photos)).filter(EventModel.id == event_id).first()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
         
+    # Delete all photos associated with the event from Cloudinary
+    for photo in event.photos:
+        try:
+            public_id = "/".join(photo.url.split('/')[-2:]).split('.')[0]
+            delete_image(public_id)
+        except Exception as e:
+            # Log the error but continue with other deletions
+            print(f"Could not delete photo {photo.id} from Cloudinary: {e}")
+            
+    # Delete the event's cover image from Cloudinary
+    if event.cover_image_url:
+        try:
+            public_id = "/".join(event.cover_image_url.split('/')[-2:]).split('.')[0]
+            delete_image(public_id)
+        except Exception as e:
+            print(f"Could not delete cover image for event {event.id} from Cloudinary: {e}")
+
     db.delete(event)
     db.commit()
     

@@ -16,6 +16,9 @@ class UserResponse(BaseModel):
     email: Optional[EmailStr] = Field(None, description="The user's email address.")
     email_verified: bool = Field(False, description="Indicates if the user's email address has been verified.")
     name: Optional[str] = Field(None, description="The user's display name.")
+    avatar_url: Optional[str] = Field(None, description="URL for the user's full-size profile picture.")
+    avatar_thumbnail_url: Optional[str] = Field(None, description="URL for the user's thumbnail profile picture.")
+    avatar_file_size: Optional[int] = Field(None, description="The size of the user's avatar in bytes.")
 
 
 class SigninResponse(BaseModel):
@@ -42,6 +45,8 @@ class ResetPasswordRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     """Request model for updating user profile."""
     name: Optional[str] = Field(None, description="The new display name for the user.")
+    avatar_url: Optional[str] = Field(None, description="The new URL for the user's full-size profile picture.")
+    avatar_thumbnail_url: Optional[str] = Field(None, description="The new URL for the user's thumbnail profile picture.")
 
 
 class MessageResponse(BaseModel):

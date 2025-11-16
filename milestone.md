@@ -28,8 +28,9 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Reset password (link-based via Firebase)
 
 4. **Host Profile Endpoints** (`/me/*`)
-   - ✅ Get current user profile (**from DB**)
-   - ✅ Update profile (**in DB**)
+   - ✅ Get current user profile (**from DB**, includes avatar URLs)
+   - ✅ Update profile (**in DB**, can update name and avatar URLs)
+   - ✅ Upload/replace avatar (**to Cloudinary**)
    - ✅ Change password
 
 5. **Event Management Endpoints** (`/events/*`) - *Fully Database Integrated*
@@ -38,7 +39,7 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
    - ✅ Get event details (**from DB**)
    - ✅ Update event metadata (**in DB**)
    - ✅ Delete event (**from DB**)
-   - ✅ (Placeholder) Upload/replace cover image
+   - ✅ Upload/replace cover image (stores full image and thumbnail URL, records file size)
    - ✅ Generate QR code for event sharing
    - ✅ (Placeholder) Trigger ZIP export of photos
    - ✅ Bulk actions on events (**in DB**)
@@ -47,16 +48,16 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
 6. **Photo Moderation Endpoints** (`/events/{event_id}/photos/*`) - *Fully Database Integrated*
    - ✅ Get paginated photo list (**from DB**)
    - ✅ Update photo metadata (caption/approval) (**in DB**)
-   - ✅ Remove single photo (**from DB**)
-   - ✅ Bulk delete photos (**from DB**)
+   - ✅ Remove single photo (**from DB and Cloudinary**)
+   - ✅ Bulk delete photos (**from DB and Cloudinary**)
    - ✅ (Placeholder) Bulk download photos
 
 7. **Admin Dashboard Endpoints** (`/admin/*`) - *Fully Database Integrated*
-   - ✅ Get overview stats (**from DB**)
+   - ✅ Get overview stats (**from DB**, includes accurate storage calculation)
    - ✅ List/search/filter all events (**from DB**)
    - ✅ Deep event inspection (**from DB**)
    - ✅ Update event status (**in DB**)
-   - ✅ Force-delete event (**from DB**)
+   - ✅ Force-delete event (**from DB and Cloudinary, including all associated photos and cover image**)
    - ✅ Get recent uploads activity feed (**from DB**)
    - ✅ List host accounts (**from DB**)
    - ✅ Inspect host profile + events (**from DB**)
@@ -91,7 +92,7 @@ Your Firebase Authentication backend with FastAPI is now complete! Here's what's
     - ✅ Public event viewing (no authentication required)
     - ✅ Public photo viewing (approved photos only)
     - ✅ Password-protected event access
-    - ✅ Public photo uploads
+    - ✅ Public photo uploads (counts towards host's 1GB limit, stores unique public uploader ID)
 
 13. **QR Code Generation**
     - ✅ QR code generation for event share links
@@ -126,6 +127,9 @@ FIREBASE_CREDENTIALS_PATH=./firebase_account_services.json
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAILS=officialphotolab2025@gmail.com
 DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/postgres
+
+# Cloudinary URL for image storage
+CLOUDINARY_URL="cloudinary://<api_key>:<api_secret>@<cloud_name>"
 
 # Email Configuration (Gmail SMTP)
 EMAIL_ENABLED=true
@@ -207,18 +211,29 @@ curl http://localhost:8000/health
 
 ### For Backend Development
 
-1. **Implement File Storage**:
-   - Integrate a file storage service (e.g., Firebase Storage, AWS S3).
-   - Implement actual photo and cover image upload/download logic in the respective endpoints.
-
-2. **Flesh out Placeholder Endpoints**:
+1. **Flesh out Placeholder Endpoints**:
    - Implement background tasks for ZIP exports of photos and system data exports.
    - Implement audit log retrieval from a logging service or database.
 
-3. **Enhancements**:
+2. **Enhancements**:
    - Add search and filtering to admin dashboard
    - Implement event slug system (currently uses event ID)
    - Add rate limiting for API endpoints
+
+### Completed Backend Features
+
+- **File Storage & Management**:
+  - Integrated Cloudinary for photo, event cover, and user avatar uploads.
+  - Implemented automatic thumbnail generation for event covers and user avatars.
+  - Ensured Cloudinary asset deletion upon corresponding database record removal (photos, event covers, user avatars).
+  - Added file size tracking for all uploaded assets.
+- **Upload Limits**:
+  - Implemented a 1GB upload limit per authenticated user (hosts/admins), encompassing all their direct uploads and public uploads to their events.
+- **User Avatars**:
+  - Added functionality for users to upload and manage their profile pictures (avatars).
+- **Data Consistency**:
+  - Updated database schemas and Pydantic models to reflect all new fields and functionalities.
+  - Applied necessary Alembic migrations.
 
 ## 🔍 Testing Your Setup
 

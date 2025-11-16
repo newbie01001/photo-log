@@ -17,8 +17,12 @@ from app.models.photo import (
 )
 from app.models.auth import MessageResponse
 from app.database import get_db
+from app.services.cloudinary import upload_image
+from app.crud import get_user_upload_size
+import cloudinary
 
 router = APIRouter(prefix="/public", tags=["public"])
+
 
 
 def get_event_by_slug(db: Session, slug: str) -> EventModel:
@@ -192,31 +196,53 @@ async def upload_public_photo(
             detail="File is empty."
         )
     
-    # TODO: Upload file to storage service (e.g., S3, Firebase Storage)
-    # For now, we'll create a placeholder URL
-    # In production, this would be:
-    # 1. Upload to storage service
-    # 2. Get the public URL
-    # 3. Optionally create a thumbnail
-    # 4. Store URLs in database
+    # Check upload limit against the event host
+    MAX_UPLOAD_SIZE_PER_USER = 1 * 1024 * 1024 * 1024  # 1GB
+    host_id = event.host_id
+    current_upload_size = get_user_upload_size(db, host_id)
+    if current_upload_size + file_size > MAX_UPLOAD_SIZE_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Host's upload limit exceeded. The host has {round(current_upload_size / (1024*1024*1024), 2)}GB uploaded. Max allowed is 1GB."
+        )
+
+    # Reset file pointer after reading
+    await file.seek(0)
     
-    # Placeholder: Generate a URL (in production, this comes from storage service)
-    photo_id = str(uuid.uuid4())
-    # In a real implementation, you would upload to storage and get the URL
-    # For now, we'll use a placeholder
-    file_url = f"https://storage.example.com/photos/{photo_id}/{file.filename}"
-    thumbnail_url = f"https://storage.example.com/photos/{photo_id}/thumb_{file.filename}"
+    # Upload file to Cloudinary
+    try:
+        upload_result = upload_image(file)
+        if not upload_result or "secure_url" not in upload_result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload image to storage."
+            )
+        
+        file_url = upload_result["secure_url"]
+        # Generate a thumbnail URL from Cloudinary's response
+        thumbnail_url = cloudinary.CloudinaryImage(upload_result["public_id"]).build_url(
+            transformation=[
+                {'width': 400, 'height': 400, 'crop': 'fill'}
+            ]
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred during file upload: {str(e)}"
+        )
     
     # Create photo record in database
     # Photos uploaded by public visitors start as unapproved (approved=False)
     new_photo = PhotoModel(
-        id=photo_id,
+        id=str(uuid.uuid4()),
         event_id=event.id,
         url=file_url,
         thumbnail_url=thumbnail_url,
         caption=caption,
         approved=False,  # Requires host approval
-        uploaded_by=None  # Could be an anonymous identifier or email if provided
+        uploaded_by=host_id,  # Associate with the host for quota tracking
+        public_uploader_identifier=str(uuid.uuid4()), # Unique ID for the anonymous uploader
+        file_size=file_size,
     )
     
     db.add(new_photo)

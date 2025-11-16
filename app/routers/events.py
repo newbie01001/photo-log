@@ -1,7 +1,7 @@
 """
 Events router - handles all /events/* endpoints for host management.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
@@ -20,6 +20,9 @@ from app.models.event import (
 from app.crud import get_or_create_user
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.services.cloudinary import upload_image
+from app.crud import get_user_upload_size
+import cloudinary
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -144,24 +147,67 @@ async def delete_event(
     
     return MessageResponse(message=f"Event '{event_id}' and all associated assets have been deleted.")
 
-@router.post("/{event_id}/cover", response_model=MessageResponse)
+@router.post("/{event_id}/cover", response_model=EventResponse)
 async def upload_event_cover_image(
     event_id: str,
+    file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Upload or replace the cover image for an event.
-    (This endpoint is a placeholder and does not handle file uploads yet).
     """
-    verify_event_ownership(db, event_id, user["uid"])
-    # TODO: Implement file upload logic (e.g., using FastAPI's UploadFile).
-    # The file would be saved to a storage service (like S3 or Firebase Storage),
-    # and the resulting URL would be saved in the event's `cover_image_url` field.
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Cover image upload functionality is not yet implemented."
-    )
+    event = verify_event_ownership(db, event_id, user["uid"])
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image."
+        )
+
+    # Read file content to get size
+    file_content = await file.read()
+    file_size = len(file_content)
+    await file.seek(0)  # Reset file pointer
+
+    # Check upload limit
+    MAX_UPLOAD_SIZE_PER_USER = 1 * 1024 * 1024 * 1024  # 1GB
+    current_upload_size = get_user_upload_size(db, user["uid"])
+    if current_upload_size + file_size > MAX_UPLOAD_SIZE_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Upload limit exceeded. You have {round(current_upload_size / (1024*1024*1024), 2)}GB uploaded. Max allowed is 1GB."
+        )
+
+    # Upload image to Cloudinary
+    try:
+        # We can use the event_id as part of the public_id to keep it unique
+        public_id = f"event_covers/{event_id}_{uuid.uuid4()}"
+        upload_result = upload_image(file, public_id=public_id)
+        if not upload_result or "secure_url" not in upload_result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload cover image."
+            )
+        
+        event.cover_image_url = upload_result["secure_url"]
+        event.cover_thumbnail_url = cloudinary.CloudinaryImage(upload_result["public_id"]).build_url(
+            transformation=[
+                {'width': 400, 'height': 400, 'crop': 'fill'}
+            ]
+        )
+        event.cover_image_file_size = file_size
+        db.commit()
+        db.refresh(event)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred during cover image upload: {str(e)}"
+        )
+    
+    return event
 
 @router.get("/{event_id}/qr", response_model=MessageResponse)
 async def get_event_qr_code(

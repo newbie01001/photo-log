@@ -62,9 +62,31 @@ pip install email-validator
 1. Check `.env` file has: `FRONTEND_URL=http://localhost:5173`
 2. Make sure CORS middleware is configured in `app/main.py`
 
+### Error: `Image uploads are failing`
+
+**Problem**: The Cloudinary URL is not configured correctly.
+
+**Solution**:
+1. Make sure you have a `.env` file in the `backend/` directory.
+2. Check that the `.env` file contains a valid `CLOUDINARY_URL`. It should look like this:
+   ```
+   CLOUDINARY_URL="cloudinary://<api_key>:<api_secret>@<cloud_name>"
+   ```
+3. Ensure the API key, secret, and cloud name are correct.
+
+### Error: `Upload limit exceeded`
+
+**Problem**: An authenticated user (host/admin) has exceeded their 1GB total upload limit.
+
+**Solution**:
+1. The 1GB limit applies to all files uploaded by an authenticated user, including event cover images, user avatars, and all photos uploaded to events they host (even public uploads).
+2. To free up space, the user needs to delete some of their existing uploads.
+3. Consider increasing the limit in `app/routers/events.py` and `app/routers/profiles.py` if a higher limit is desired.
+
 ### Error: `admin_emails` parsing error
 
 **Problem**: Pydantic can't parse the admin_emails list from .env.
+
 
 **Solution**: This is already fixed! The config now uses a comma-separated string:
 ```
