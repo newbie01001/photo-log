@@ -299,9 +299,9 @@ backend/
 
 The backend supports email notifications via Gmail SMTP:
 
-- ✅ **Welcome emails** - Sent automatically when users sign up
-- ✅ **Photo approval notifications** - Sent when photos are approved/rejected
-- ✅ **Export completion notifications** - Ready for use when export feature is implemented
+- ✅**Welcome emails** - Sent automatically when users sign up
+- ✅**Photo approval notifications** - Sent when photos are approved/rejected
+- ✅**Export completion notifications** - Ready for use when export feature is implemented
 
 See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for detailed setup instructions.
 
