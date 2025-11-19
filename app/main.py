@@ -80,10 +80,13 @@ async def root():
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     """Handle HTTP exceptions."""
-    return {
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
         "detail": exc.detail,
         "status_code": exc.status_code
-    }
+        }
+    )
 
 
 if __name__ == "__main__":
