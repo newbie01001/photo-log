@@ -39,7 +39,7 @@ def generate_share_link(event_id: str) -> str:
     # For now, using event ID as slug
     # In the future, this could use a proper slug field
     base_url = settings.frontend_url.rstrip('/')
-    return f"{base_url}/events/{event_id}"
+    return f"{base_url}/event/{event_id}"
 
 def event_to_response(event: EventModel, db: Session = None, photo_count: int = None) -> EventResponse:
     """
@@ -56,6 +56,9 @@ def event_to_response(event: EventModel, db: Session = None, photo_count: int = 
             photo_count = len(event.photos) if hasattr(event, 'photos') and event.photos else 0
     
     # Create response dict
+    # Handle updated_at: if None (newly created event), use created_at as fallback
+    updated_at = event.updated_at if event.updated_at is not None else event.created_at
+    
     response_dict = {
         "id": event.id,
         "host_id": event.host_id,
@@ -69,7 +72,7 @@ def event_to_response(event: EventModel, db: Session = None, photo_count: int = 
         "is_active": event.is_active,
         "is_archived": event.is_archived,
         "created_at": event.created_at,
-        "updated_at": event.updated_at,
+        "updated_at": updated_at,
         "photo_count": photo_count,
         "share_link": generate_share_link(event.id)
     }

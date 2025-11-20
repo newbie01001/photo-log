@@ -29,7 +29,7 @@ router = APIRouter(prefix="/events", tags=["photos"])
 
 # --- Host Moderation Endpoints ---
 
-@router.get("/events/{event_id}/photos", response_model=PhotoListResponse)
+@router.get("/{event_id}/photos", response_model=PhotoListResponse)
 async def get_event_photos(
     event_id: str,
     page: int = Query(1, ge=1, description="Page number"),
@@ -57,7 +57,7 @@ async def get_event_photos(
         has_more=(offset + len(photos)) < total_photos
     )
 
-@router.patch("/events/{event_id}/photos/{photo_id}", response_model=PhotoResponse)
+@router.patch("/{event_id}/photos/{photo_id}", response_model=PhotoResponse)
 async def update_photo(
     event_id: str,
     photo_id: str,
@@ -120,7 +120,7 @@ async def update_photo(
     
     return photo
 
-@router.delete("/events/{event_id}/photos/{photo_id}", response_model=MessageResponse)
+@router.delete("/{event_id}/photos/{photo_id}", response_model=MessageResponse)
 async def delete_photo(
     event_id: str,
     photo_id: str,
@@ -158,7 +158,7 @@ async def delete_photo(
     
     return MessageResponse(message=f"Photo '{photo_id}' deleted successfully from event '{event_id}'.")
 
-@router.post("/events/{event_id}/photos/bulk-delete", response_model=MessageResponse)
+@router.post("/{event_id}/photos/bulk-delete", response_model=MessageResponse)
 async def bulk_delete_photos(
     event_id: str,
     request: BulkDeleteRequest,
@@ -193,7 +193,7 @@ async def bulk_delete_photos(
         message=f"Successfully deleted {deleted_count} photo(s) from event '{event_id}'."
     )
 
-@router.post("/events/{event_id}/photos/bulk-download", response_model=MessageResponse)
+@router.post("/{event_id}/photos/bulk-download", response_model=MessageResponse)
 async def bulk_download_photos(
     event_id: str,
     request: BulkDownloadRequest,

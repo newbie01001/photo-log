@@ -1,0 +1,1 @@
+docker run --name photolog-db -e POSTGRES_PASSWORD=photolab456 -p 5432:5432 -d postgres

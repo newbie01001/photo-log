@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     
     # Frontend configuration
     frontend_url: str = "http://localhost:5173"
+    
+    # CORS allowed origins (comma-separated list)
+    # Example: "http://localhost:5173,http://10.53.188.100:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:5173"
 
     # Cloudinary configuration
     # Cloudinary URL format: cloudinary://api_key:api_secret@cloud_name
@@ -48,6 +52,15 @@ class Settings(BaseSettings):
         if not self.admin_emails:
             return []
         return [email.strip() for email in self.admin_emails.split(",") if email.strip()]
+    
+    def get_cors_origins_list(self) -> List[str]:
+        """
+        Parses the comma-separated cors_origins string into a list of allowed origins.
+        Returns a default list with localhost if not configured.
+        """
+        if not self.cors_origins:
+            return ["http://localhost:5173"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
     
     class Config:
         env_file = ".env"
