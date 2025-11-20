@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 import uuid
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, cast, Integer
 
 from app.dependencies import get_current_admin_user
 from app.models.admin import (
@@ -25,6 +25,7 @@ from app.models.user import UserProfile, User as UserModel
 from app.models.photo import Photo as PhotoModel
 from app.database import get_db
 from app.services.cloudinary import delete_image
+from app.config import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -43,8 +44,9 @@ async def get_overview_stats(
     total_photos = db.query(PhotoModel).count()
     
     # Calculate total storage from photos and event covers
-    total_photo_storage = db.query(func.sum(PhotoModel.file_size)).scalar() or 0
-    total_cover_storage = db.query(func.sum(EventModel.cover_image_file_size)).scalar() or 0
+    # Cast string columns to integer for sum operation
+    total_photo_storage = db.query(func.sum(cast(PhotoModel.file_size, Integer))).scalar() or 0
+    total_cover_storage = db.query(func.sum(cast(EventModel.cover_image_file_size, Integer))).scalar() or 0
     total_storage_bytes = total_photo_storage + total_cover_storage
     total_storage_gb = round(total_storage_bytes / (1024**3), 4) if total_storage_bytes else 0
 
@@ -80,7 +82,18 @@ async def list_all_events(
             name=event.host.name,
             email_verified=True # Assuming verified for existing users
         ) if event.host else None
-        admin_events.append(AdminEventResponse(**event.__dict__, host=host_profile))
+        # Exclude 'host' and 'photos' from event.__dict__ to avoid duplicate keyword argument
+        # Handle updated_at: if None (newly created event), use created_at as fallback
+        event_dict = {k: v for k, v in event.__dict__.items() if k not in ['host', 'photos']}
+        if event_dict.get('updated_at') is None:
+            event_dict['updated_at'] = event_dict.get('created_at')
+        # Add computed fields required by EventResponse
+        photo_count = db.query(PhotoModel).filter(PhotoModel.event_id == event.id).count()
+        event_dict['photo_count'] = photo_count
+        # Generate share link
+        base_url = settings.frontend_url.rstrip('/')
+        event_dict['share_link'] = f"{base_url}/event/{event.id}"
+        admin_events.append(AdminEventResponse(**event_dict, host=host_profile))
 
     return AdminEventListResponse(
         events=admin_events,
@@ -110,7 +123,18 @@ async def inspect_event(
         email_verified=True
     ) if event.host else None
 
-    return AdminEventResponse(**event.__dict__, host=host_profile)
+    # Exclude 'host' and 'photos' from event.__dict__ to avoid duplicate keyword argument
+    # Handle updated_at: if None (newly created event), use created_at as fallback
+    event_dict = {k: v for k, v in event.__dict__.items() if k not in ['host', 'photos']}
+    if event_dict.get('updated_at') is None:
+        event_dict['updated_at'] = event_dict.get('created_at')
+    # Add computed fields required by EventResponse
+    photo_count = db.query(PhotoModel).filter(PhotoModel.event_id == event.id).count()
+    event_dict['photo_count'] = photo_count
+    # Generate share link
+    base_url = settings.frontend_url.rstrip('/')
+    event_dict['share_link'] = f"{base_url}/event/{event.id}"
+    return AdminEventResponse(**event_dict, host=host_profile)
 
 @router.patch("/events/{event_id}/status", response_model=AdminEventResponse)
 async def update_event_status(
@@ -143,7 +167,18 @@ async def update_event_status(
         email_verified=True
     ) if event.host else None
     
-    return AdminEventResponse(**event.__dict__, host=host_profile)
+    # Exclude 'host' and 'photos' from event.__dict__ to avoid duplicate keyword argument
+    # Handle updated_at: if None (newly created event), use created_at as fallback
+    event_dict = {k: v for k, v in event.__dict__.items() if k not in ['host', 'photos']}
+    if event_dict.get('updated_at') is None:
+        event_dict['updated_at'] = event_dict.get('created_at')
+    # Add computed fields required by EventResponse
+    photo_count = db.query(PhotoModel).filter(PhotoModel.event_id == event.id).count()
+    event_dict['photo_count'] = photo_count
+    # Generate share link
+    base_url = settings.frontend_url.rstrip('/')
+    event_dict['share_link'] = f"{base_url}/event/{event.id}"
+    return AdminEventResponse(**event_dict, host=host_profile)
 
 @router.delete("/events/{event_id}", response_model=MessageResponse)
 async def force_delete_event(
