@@ -43,6 +43,7 @@ app.add_middleware(
         "https://photo-log-ashy.vercel.app",
         "http://localhost:5173",
         "https://photo-log.onrender.com",
+        "http://10.132.135.100:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],

@@ -31,6 +31,7 @@ async def signup(request: TokenRequest, background_tasks: BackgroundTasks, db: S
     Register a new host user.
     
     Verifies the Firebase token and creates a corresponding user in the database if one doesn't already exist.
+    Rejects signup if email already exists with a different UID (user should sign in instead).
     """
     try:
         user_info = verify_firebase_token(request.token)
@@ -41,7 +42,14 @@ async def signup(request: TokenRequest, background_tasks: BackgroundTasks, db: S
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = get_or_create_user(db, user_info)
+    try:
+        user = get_or_create_user(db, user_info, is_signup=True)
+    except ValueError as e:
+        # Handle case where email exists with different UID
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     
     # Send welcome email in the background
     background_tasks.add_task(
