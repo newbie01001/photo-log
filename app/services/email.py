@@ -72,8 +72,11 @@ class EmailService:
             logger.info(f"Email sent successfully to {to_email}")
             return True
             
+        except smtplib.SMTPException as e:
+            logger.error(f"Failed to send email to {to_email} due to SMTP error: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {e}")
+            logger.error(f"An unexpected error occurred while sending email to {to_email}: {e}")
             return False
     
     def send_welcome_email(self, user_email: str, user_name: Optional[str] = None) -> bool:

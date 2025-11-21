@@ -1,7 +1,7 @@
 """
 Authentication router - handles all /auth/* endpoints.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 import logging
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=SigninResponse)
-async def signup(request: TokenRequest, db: Session = Depends(get_db)):
+async def signup(request: TokenRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Register a new host user.
     
@@ -43,14 +43,12 @@ async def signup(request: TokenRequest, db: Session = Depends(get_db)):
     
     user = get_or_create_user(db, user_info)
     
-    # Send welcome email (non-blocking)
-    try:
-        email_service.send_welcome_email(
-            user_email=user.email,
-            user_name=user.name
-        )
-    except Exception as e:
-        logger.warning(f"Failed to send welcome email to {user.email}: {e}")
+    # Send welcome email in the background
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user_email=user.email,
+        user_name=user.name
+    )
     
     user_response = UserResponse(
         uid=user.id,
