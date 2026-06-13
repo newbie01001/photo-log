@@ -24,7 +24,19 @@ class EmailService:
         self.smtp_server = settings.smtp_server
         self.smtp_port = settings.smtp_port
         self.smtp_username = settings.smtp_username
-        self.smtp_password = settings.smtp_password
+        self.smtp_password = settings.smtp_password.replace(" ", "")
+        self.smtp_tls = settings.smtp_tls
+    
+    def _connect_smtp(self) -> smtplib.SMTP:
+        """Connect using SSL (port 465) or STARTTLS (port 587)."""
+        timeout = 30
+        if self.smtp_port == 465:
+            return smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=timeout)
+        
+        server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=timeout)
+        if self.smtp_tls:
+            server.starttls()
+        return server
     
     def _load_template(self, template_name: str) -> Template:
         """Load email template from file."""
@@ -63,9 +75,7 @@ class EmailService:
             part2 = MIMEText(html_content, 'html')
             msg.attach(part2)
             
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
+            with self._connect_smtp() as server:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             
